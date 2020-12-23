@@ -53,7 +53,6 @@ bool gSwssRecord = true;
 bool gLogRotate = false;
 bool gSaiRedisLogRotate = false;
 bool gSyncMode = false;
-sai_redis_communication_mode_t gRedisCommunicationMode = SAI_REDIS_COMMUNICATION_MODE_REDIS_ASYNC;
 char *gAsicInstance = NULL;
 
 extern bool gIsNatSupported;
@@ -63,7 +62,7 @@ string gRecordFile;
 
 void usage()
 {
-    cout << "usage: orchagent [-h] [-r record_type] [-d record_location] [-b batch_size] [-m MAC] [-i INST_ID] [-s] [-z mode]" << endl;
+    cout << "usage: orchagent [-h] [-r record_type] [-d record_location] [-b batch_size] [-m MAC] [-i INST_ID] [-s]" << endl;
     cout << "    -h: display this message" << endl;
     cout << "    -r record_type: record orchagent logs with type (default 3)" << endl;
     cout << "                    0: do not record logs" << endl;
@@ -74,8 +73,7 @@ void usage()
     cout << "    -b batch_size: set consumer table pop operation batch size (default 128)" << endl;
     cout << "    -m MAC: set switch MAC address" << endl;
     cout << "    -i INST_ID: set the ASIC instance_id in multi-asic platform" << endl;
-    cout << "    -s: enable synchronous mode (depreacated, use -z)" << endl;
-    cout << "    -z: redis communication mode (redis_async|redis_sync|zmq_sync), default: redis_async" << endl;
+    cout << "    -s: enable synchronous mode" << endl;
 }
 
 void sighup_handler(int signo)
@@ -124,7 +122,7 @@ int main(int argc, char **argv)
 
     string record_location = ".";
 
-    while ((opt = getopt(argc, argv, "b:m:r:d:i:hsz:")) != -1)
+    while ((opt = getopt(argc, argv, "b:m:r:d:i:hs")) != -1)
     {
         switch (opt)
         {
@@ -176,9 +174,6 @@ int main(int argc, char **argv)
         case 's':
             gSyncMode = true;
             SWSS_LOG_NOTICE("Enabling synchronous mode");
-            break;
-        case 'z':
-            sai_deserialize_redis_communication_mode(optarg, gRedisCommunicationMode);
             break;
 
         default: /* '?' */
@@ -234,15 +229,11 @@ int main(int argc, char **argv)
     // when g_syncMode is set to true here, create_switch will wait the response from syncd
     if (gSyncMode)
     {
-        SWSS_LOG_WARN("sync mode is depreacated, use -z param");
+        attr.id = SAI_REDIS_SWITCH_ATTR_SYNC_MODE;
+        attr.value.booldata = true;
 
-        gRedisCommunicationMode = SAI_REDIS_COMMUNICATION_MODE_REDIS_SYNC;
+        sai_switch_api->set_switch_attribute(gSwitchId, &attr);
     }
-
-    attr.id = SAI_REDIS_SWITCH_ATTR_REDIS_COMMUNICATION_MODE;
-    attr.value.s32 = gRedisCommunicationMode;
-
-    sai_switch_api->set_switch_attribute(gSwitchId, &attr);
 
     if (gAsicInstance)
     {
